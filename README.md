@@ -1,6 +1,5 @@
 Algorithms
 ==========
 
-Algorithms in C++
+Algorithms
 
-Nothing yet
