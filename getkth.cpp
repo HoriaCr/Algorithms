@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <iostream>
 #include <cassert>
+#include <random>
+#include <ctime>
 
 using namespace std;
 
@@ -132,7 +134,8 @@ public:
 		for (auto w = rbegin(state[v].next); w != rend(state[v].next); w++) {
 			if (state[w->second].substringsNumber <= k) {
 				k -= state[w->second].substringsNumber;
-			} else {
+			}
+			else {
 				return w->first + getKth(w->second, k);
 			}
 		}
@@ -205,28 +208,29 @@ public:
 
 	SuffixArray(const string& str) {
 		n = static_cast<int>(str.size());
-		vector< pair< pair<int,int>, int> > L(n);
-		P.resize(getLog(n) + 1, vector<int>(n));
+		vector< pair< pair<int, int>, int> > L(n);
+		m = getLog(n) ;
+		P.resize(m, vector<int>(n));
 		for (int i = 0; i < n; i++) {
 			P[0][i] = str[i] - 'a';
 		}
 		int step, cnt;
-		for (step = 1, cnt = 1; cnt >> 1 < n; ++step, cnt <<= 1) {
+		for (step = 1, cnt = 1; cnt < n; ++step, cnt <<= 1) {
 			for (int i = 0; i < n; i++) {
-				L[i] = { {P[step - 1][i], i + cnt < n ? P[step - 1][i + cnt] : -1 }, i};
+				L[i] = { { P[step - 1][i], i + cnt < n ? P[step - 1][i + cnt] : -1 }, i };
 			}
 			sort(L.begin(), L.end());
-		
+
 			for (int i = 1; i < n; i++) {
 				P[step][L[i].second] = L[i].first == L[i - 1].first ? P[step][L[i - 1].second] : i;
 			}
-			for (int i = 0; i < n; i++) cout << P[step][i] << " "; cout << "\n";
 		}
 
 	}
 
 	int lcp(int a, int b) {
 		int ret = 0;
+		if (a == b) return n - a;
 		for (int k = m - 1; k >= 0 && a < n && b < n; k--) {
 			if (P[k][a] == P[k][b]) {
 				ret += 1 << k;
@@ -245,21 +249,14 @@ int getLongestPalindrome(const string& str) {
 	SuffixArray sa(s);
 	int n = (int)str.size();
 	int ans = 1;
-	//baabx xbaab
-	//01234 56789
-	cout << s << "\n";
 	for (int i = 1; i < n - 1; i++) {
-		//cout << n - i + 1 << " ";
-		int val = sa.lcp(i, 2 * n - i + 1 );
-		cout << i << " " << 2 * n - i + 1 << " val :" << val << "\n";
-		cout << string(s.begin() + i, s.begin() + str.size()) << 
-		"\n" << string(s.begin() + 2 * n - i + 1, s.end()) << "\n";
-		
-	
+		int val = 2*sa.lcp(i, 2 * n - i + 1); // even case
+		ans = max(ans, val);
+		val = 2*sa.lcp(i + 1, 2 * n - i + 1) + 1; // odd case
+		ans = max(ans, val);
 	}
 	return ans;
 }
-
 
 void testKth(ifstream& cin, ofstream& cout) {
 	SuffixAutomaton sa("axadyax");
@@ -271,16 +268,51 @@ void testKth(ifstream& cin, ofstream& cout) {
 	}
 
 	cout << "\n";
-	for (int i = 0; i < (int) good.size(); i++) {
+	for (int i = 0; i < (int)good.size(); i++) {
 		cout << sa.getKth(i) << " ";
+	}
+}
+
+void testSuffixArrayLcp() {
+	auto getLcp = [](const string& a, const string& b) -> int {
+		size_t i = 0;
+		while (i < a.size() && i < b.size() && a[i] == b[i]) i++;
+		return i;
+	};
+	std::mt19937 mt(time(0));
+	std::uniform_int_distribution<int> dist(0, 5);
+
+	auto nextString = [&](int length) -> string {
+		string ret(length, '.');
+		for (char& c : ret) {
+			c = (char)('a' + dist(mt));
+		}
+		return ret;
+	};
+
+	for (int test = 1; test <= 10; test++) {
+		string s = nextString(6);
+		SuffixArray sa(s);
+		cout << s << "\n";
+		for (size_t i = 0; i < s.size(); i++) {
+			for (size_t j = 0; j < s.size(); j++) {
+				int x1 = sa.lcp(i, j);
+				int x2 = getLcp(string(s.begin() + i, s.end()), string(s.begin() + j, s.end()));
+				if (x1 != x2) {
+					cout << i << " " << j << "\n";
+					cout << x1 << " " << x2 << "\n";
+					return;
+				}
+			}
+		}
 	}
 }
 
 int main()
 {
-	ifstream cin("test.in"); 
+	ifstream cin("test.in");
 	ofstream cout("test.out");
 	//testKth(cin, cout);
-	cout << getLongestPalindrome("xybaab");
+	cout << getLongestPalindrome("xybayab");
 	return 0;
 }
