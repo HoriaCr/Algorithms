@@ -10,6 +10,7 @@
 #include <bitset>
 #include <cstring>
 #include <complex>
+#include <cassert>
 
 using namespace std;
 
@@ -163,7 +164,7 @@ public:
 
 	}
 
-	friend ostream& operator << (ostream& out, Polynomial& p) {
+	friend ostream& operator << (ostream& out, const Polynomial& p) {
 		for (size_t i = 0; i < p.data.size(); i++) {
 			if (p.data[i] != 0) {
 				out << p.data[i];
@@ -174,10 +175,10 @@ public:
 		return out;
 	}
 };
-
 template<class DataType = int>
 class SquareMatrix {
-	unsigned int Size;
+	const static unsigned int minMatrixSize = 64;
+    unsigned int Size;
 	vector< vector<DataType> > matrix;
 
 	public:
@@ -192,10 +193,11 @@ class SquareMatrix {
 	}
 
 	SquareMatrix(const vector< vector<DataType> >& data) {
-		if (data.size() == data[0].size()) {
-			Size = data.size();
-			matrix = data;
-		}
+        for (const auto& x : data) {
+            assert(x.size() == data.size());
+        }
+        Size = data.size();
+        matrix = data;
 	}
 
 	vector<DataType>& operator [](const int& x) {
@@ -217,14 +219,10 @@ class SquareMatrix {
 		return ret;
 	}
 
-	SquareMatrix& operator = (SquareMatrix B) {
-		matrix.resize(B.Size);
-		for (size_t i = 0; i < Size; i++) {
-			for (size_t j = 0; j < Size; j++) {
-				matrix[i][j] = B.matrix[i][j];
-			}
-		}
-		return *this;
+	SquareMatrix& operator = (const SquareMatrix& B) {
+		Size = B.Size;
+		matrix = B.matrix;
+        return *this;
 	}
 
 	void operator += (const SquareMatrix &B) {
@@ -235,14 +233,28 @@ class SquareMatrix {
 		}
 	}
 
+    void operator -= (const SquareMatrix &B) {
+		for (size_t i = 0; i < Size; i++) {
+			for (size_t j = 0; j < Size; j++) {
+				matrix[i][j] -= B.matrix[i][j];
+			}
+		}
+    }
+
 	SquareMatrix operator + (const SquareMatrix &B) const {
 		SquareMatrix ret(matrix);
 		ret += B;
 		return ret;
 	}
 
+	SquareMatrix operator - (const SquareMatrix &B) const {
+		SquareMatrix ret(matrix);
+		ret -= B;
+		return ret;
+	}
+
 	SquareMatrix operator * (const SquareMatrix &B) const {
-		SquareMatrix ret(matrix.Size);
+		SquareMatrix ret(B.Size);
 		for (size_t i = 0; i < Size; i++) {
 			for (size_t j = 0; j < Size; j++) {
 				for (size_t k = 0; k < Size; k++) {
@@ -307,6 +319,121 @@ class SquareMatrix {
 		return ret;
 	}
 
+
+
+    void strassenR(const SquareMatrix &A, 
+                   const SquareMatrix &B, 
+                         SquareMatrix &C) {
+        if (A.Size <= minMatrixSize) {
+            C = A * B;
+            return;
+        }   
+        // other cases are treated here:
+        else {
+            int newSize = A.Size / 2;
+            SquareMatrix
+                a11(newSize), a12(newSize), a21(newSize), a22(newSize),
+                b11(newSize), b12(newSize), b21(newSize), b22(newSize),
+                c11(newSize), c12(newSize), c21(newSize), c22(newSize),
+                p1(newSize), p2(newSize), p3(newSize), p4(newSize), 
+                p5(newSize), p6(newSize), p7(newSize),
+                aResult(newSize), bResult(newSize);
+     
+            int i, j;
+     
+            //dividing the matrices in 4 sub-matrices:
+            for (i = 0; i < newSize; i++) {
+                for (j = 0; j < newSize; j++) {
+                    a11.matrix[i][j] = A.matrix[i][j];
+                    a12.matrix[i][j] = A.matrix[i][j + newSize];
+                    a21.matrix[i][j] = A.matrix[i + newSize][j];
+                    a22.matrix[i][j] = A.matrix[i + newSize][j + newSize];
+     
+                    b11.matrix[i][j] = B.matrix[i][j];
+                    b12.matrix[i][j] = B.matrix[i][j + newSize];
+                    b21.matrix[i][j] = B.matrix[i + newSize][j];
+                    b22.matrix[i][j] = B.matrix[i + newSize][j + newSize];
+                }
+            }
+            // Calculating p1 to p7:
+     
+            aResult = a11 + a22;// a11 + a22
+            bResult = b11 + b22; // b11 + b22
+            strassenR(aResult, bResult, p1); // p1 = (a11+a22) * (b11+b22)
+     
+            aResult = a21 + a22; // a21 + a22
+            strassenR(aResult, b11, p2); // p2 = (a21+a22) * (b11)
+     
+            bResult = b12 - b22; // b12 - b22
+            strassenR(a11, bResult, p3); // p3 = (a11) * (b12 - b22)
+     
+            bResult = b21 - b11; // b21 - b11
+            strassenR(a22, bResult, p4); // p4 = (a22) * (b21 - b11)
+     
+            aResult = a11 + a12; // a11 + a12
+            strassenR(aResult, b22, p5); // p5 = (a11+a12) * (b22)   
+     
+            aResult = a21 - a11; // a21 - a11
+            bResult = b11 + b12; // b11 + b12
+            strassenR(aResult, bResult, p6); // p6 = (a21-a11) * (b11+b12)
+     
+            aResult = a12 - a22; // a12 - a22
+            bResult  = b21 + b22; // b21 + b22
+            strassenR(aResult, bResult, p7); // p7 = (a12-a22) * (b21+b22)
+     
+     
+            c12 = p3 + p5; // c12 = p3 + p5
+            c21 = p2 + p4; // c21 = p2 + p4
+     
+            aResult = p1 + p4; // p1 + p4
+            bResult = aResult + p7; // p1 + p4 + p7
+            c11 = bResult - p5; // c11 = p1 + p4 - p5 + p7
+     
+            aResult = p1 + p3; // p1 + p3
+            bResult = aResult + p6; // p1 + p3 + p6
+            c22 =  bResult - p2; // c22 = p1 + p3 - p2 + p6
+    
+
+            // Grouping the results obtained in a single matrix:
+            for (i = 0; i < newSize ; i++) {
+                for (j = 0 ; j < newSize ; j++) {
+                    C.matrix[i][j] = c11.matrix[i][j];
+                    C.matrix[i][j + newSize] = c12.matrix[i][j];
+                    C.matrix[i + newSize][j] = c21.matrix[i][j];
+                    C.matrix[i + newSize][j + newSize] = c22.matrix[i][j];
+                }
+            }
+        }
+    }
+
+
+    unsigned int nextPowerOfTwo(int n) {
+        return 1 << int(ceil(log2(n)));
+    }
+
+
+    void strassen(const SquareMatrix &A, 
+                  const SquareMatrix &B, 
+                  SquareMatrix &C) {
+        unsigned int n = A.Size;
+        unsigned int m = nextPowerOfTwo(n);
+        SquareMatrix APrep(m), BPrep(m), CPrep(m);
+        for(unsigned int i=0; i<n; i++) {
+            for (unsigned int j=0; j<n; j++) {
+                APrep.matrix[i][j] = A.matrix[i][j];
+                BPrep.matrix[i][j] = B.matrix[i][j];
+            }
+        }
+
+        strassenR(APrep, BPrep, CPrep);
+        C = A;
+        for(unsigned int i=0; i<n; i++) {
+            for (unsigned int j=0; j<n; j++) {
+                C.matrix[i][j] = CPrep.matrix[i][j];
+            }
+        }
+    }
+
 	DataType getDeterminant() {
 		size_t n = Size;
 		size_t m = n;
@@ -359,7 +486,7 @@ class SquareMatrix {
 		return in;
 	}
 
-	friend ostream& operator << (ostream& out, SquareMatrix& A) {
+	friend ostream& operator << (ostream& out, const SquareMatrix& A) {
 		for (size_t i = 0; i < A.Size; i++) {
 			for (size_t j = 0; j < A.Size; j++) {
 				out << A.matrix[i][j] << " ";
@@ -370,6 +497,8 @@ class SquareMatrix {
 	}
 
 };
+
+
 
 template<class DataType>
 class Rational {
@@ -485,7 +614,7 @@ public:
 		return in;
 	}
 
-	friend ostream& operator << (ostream& out, Rational& f) {
+	friend ostream& operator << (ostream& out, const Rational& f) {
 		out << f.p << "/" << f.q;
 		return out;
 	}
