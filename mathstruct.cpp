@@ -14,6 +14,140 @@
 
 using namespace std;
 
+
+template<class DataType>
+class Rational {
+	DataType p, q;
+
+	long long gcd(long long a, long long b) {
+		return !b ? a : gcd(b, a % b);
+	}
+
+	long long lcm(long long a, long long b) {
+		return a * b / gcd(a, b);
+	}
+
+	void simplify() {
+		DataType g = gcd(p, q);
+		p /= g;
+		q /= g;
+	}
+
+public:
+
+	Rational(DataType P = DataType(), DataType Q = DataType(1)) :
+		p(P), q(Q) {
+
+	}
+
+	Rational& operator = (const Rational& b) {
+		p = b.p;
+		q = b.q;
+		return *this;
+	}
+
+	Rational& operator = (const int& b) {
+		p = b;
+		q = 1;
+		return *this;
+	}
+
+	void operator += (const Rational& b) {
+		if (b.q == DataType()) return;
+		if (q == 0) {
+			*this = b;
+			return;
+		}
+		long long y = lcm(q, b.q);
+		long long x = p * y / q + b.p * y / b.q;
+		p = static_cast<DataType>(x);
+		q = static_cast<DataType>(y);
+		if (p == 0 || q == 0) {
+			p = q = 0;
+		}
+	}
+
+	Rational operator + (const Rational& b) const {
+		Rational ret = *this;
+		ret += b;
+		return ret;
+	}
+
+	void operator -= (const Rational& b) {
+		if (b.q == DataType()) return;
+		if (q == 0) {
+			*this = b;
+			return;
+		}
+		long long y = lcm(q, b.q);
+		long long x = p * y / q - b.p * y / b.q;
+		p = static_cast<DataType>(x);
+		q = static_cast<DataType>(y);
+		if (p == 0 || q == 0) {
+			p = q = 0;
+		}
+	}
+
+	Rational operator - (const Rational& b) const {
+		Rational ret = *this;
+		ret -= b;
+		return ret;
+	}
+
+	void operator *= (const Rational& b) {
+		p *= b.p;
+		q *= b.q;
+		if (p == 0 || q == 0) {
+			p = q = 0;
+			return;
+		}
+	}
+
+	Rational operator * (const Rational& b) const {
+		Rational ret = *this;
+		ret *= b;
+		return ret;
+	}
+
+	void operator /= (const Rational& b) {
+		p *= b.q;
+		q *= b.p;
+		if (p == 0 || q == 0) {
+			p = q = 0;
+			return;
+		}
+	}
+
+	Rational operator / (const Rational& b) const {
+		Rational ret = *this;
+		ret /= b;
+		return ret;
+	}
+
+	friend istream& operator >> (istream& in, Rational& f) {
+		in >> f.p >> f.q;
+		return in;
+	}
+
+	friend ostream& operator << (ostream& out, const Rational& f) {
+		out << f.p << "/" << f.q;
+		return out;
+	}
+
+	bool operator == (const Rational& b) {
+		return (p == b.p && q == b.q);
+	}
+
+	bool operator < (const Rational& b) {
+		return 1.0 * p / q < 1.0* b.p / b.q;
+	}
+
+	bool operator >(const Rational& b) {
+		return 1.0 * p / q > 1.0* b.p / b.q;
+	}
+};
+
+
 template<class DataType>
 class Polynomial {
 
@@ -204,8 +338,8 @@ class SquareMatrix {
 		return matrix[x];
 	}
 
-	SquareMatrix getIdentityMatrix() {
-		SquareMatrix ret(matrix.Size);
+	SquareMatrix getIdentityMatrix() const {
+		SquareMatrix ret(Size);
 		for (size_t i = 0; i < Size; i++) {
 			for (size_t j = 0; j < Size; j++) {
 				ret[i][j] = DataType();
@@ -275,6 +409,15 @@ class SquareMatrix {
 		return ret;
 	}
 
+    SquareMatrix getTranspose() const { 
+		SquareMatrix ret(Size);
+		for (size_t i = 0; i < Size; i++) {
+			for (size_t j = 0; j < Size; j++) {
+                ret.matrix[i][j] = matrix[j][i];
+            }
+        }
+        return ret;
+    }
 
 	void operator *= (const DataType &scalar) {
 		for (size_t i = 0; i < Size; i++) {
@@ -434,13 +577,83 @@ class SquareMatrix {
         }
     }
 
-	DataType getDeterminant() {
+    SquareMatrix getInverse() const {
+        
+		size_t n = Size;
+		size_t m = n;
+        assert(n == m);
+        SquareMatrix ret(Size);
+        ret = ret.getIdentityMatrix();
+
+		
+        vector< vector< DataType > > A = matrix;
+		DataType det = 1;
+		for (size_t i = 0, j = 0; i < n && j < m;) {
+			
+            size_t k = i;
+			while (k < n && A[k][j] == DataType()) {
+				k++;
+			}
+
+			if (k == n) {
+				j++;
+				continue;
+			}
+
+			if (i != k) {
+				swap(A[i], A[k]);
+                swap(ret.matrix[i], ret.matrix[k]);
+				det *= static_cast<DataType>(-1);
+			}
+
+			for (size_t w = j + 1; w < m; w++) {
+				A[i][w] /= A[i][j];
+			}
+
+            for (size_t w = 0; w < m; w++) {
+                ret.matrix[i][w] /= A[i][j];
+            }
+
+			det *= A[i][j];
+			A[i][j] = 1;
+			for (k = i + 1; k < n; k++) { 
+                for (size_t w = 0; w < m; w++) {
+                    ret.matrix[k][w] -= ret.matrix[i][w]* A[k][j]; 
+                }
+                for (size_t w = j + 1; w < m; w++) {
+					A[k][w] -= A[i][w] * A[k][j];
+				}
+
+				A[k][j] = 0;
+			}
+
+			i++;
+			j++;
+		}
+
+        for (int i = (int)n - 2; i >= 0; i--) {
+            for (int j = 0; j <= i; j++) {
+                DataType val = A[j][i + 1];
+                for (size_t k = 0; k < n; k++) {
+                    ret.matrix[j][k] -= ret.matrix[i + 1][k] * A[j][i + 1]; 
+                }
+
+                for (size_t k = 0; k < n; k++) {
+                    A[j][k] -= A[i + 1][k] * val;
+                }
+            }
+        }
+        return ret;
+    }
+
+	DataType getDeterminant() const {
 		size_t n = Size;
 		size_t m = n;
 		vector< vector< DataType > > A = matrix;
 		DataType det = 1;
 		for (size_t i = 0, j = 0; i < n && j < m;) {
-			size_t k = i;
+			
+            size_t k = i;
 			while (k < n && A[k][j] == DataType()) {
 				k++;
 			}
@@ -472,8 +685,178 @@ class SquareMatrix {
 			j++;
 		}
 
+
 		return det;
 	}
+
+    static vector< vector<DataType> > computeBinomial(uint32_t n, uint32_t k) {
+        vector< vector<DataType> > C(n + 1, vector<DataType>(k + 1));
+        C[0][0] = 1;
+        for (size_t i = 1; i <= n; i++) {
+            C[i][0] = 1;
+            for (size_t j = 1; j <= k; j++) {
+                C[i][j] = C[i - 1][j - 1] + C[i - 1][j];  
+            }
+        }
+        return C;
+    }
+
+    pair<SquareMatrix, SquareMatrix> LU() const {
+        SquareMatrix L(Size), U(Size);
+
+        for (size_t i = 0; i < Size; i++) {
+            L.matrix[i][0] = matrix[i][0];
+        }
+        U.matrix[0][0] = 1;
+
+        for (size_t j = 1; j < Size; j++) {
+            U.matrix[0][j] = matrix[0][j] / L.matrix[0][0];
+        }
+
+        for (size_t k = 1; k < Size; k++) {
+            for (size_t i = k; i < Size; i++) {
+                L.matrix[i][k] = matrix[i][k];
+                for (size_t p = 0; p < k; p++) {
+                    L.matrix[i][k] -= L.matrix[i][p] * U.matrix[p][k];
+                }
+            }
+            U.matrix[k][k] = 1;
+            for (size_t j = k + 1; j < Size; j++) {
+                U.matrix[k][j] = matrix[k][j];
+                for (size_t p = 0; p < k; p++) {
+                    U.matrix[k][j] -= L.matrix[k][p] * U.matrix[p][j];
+                }
+                U.matrix[k][j] /= L.matrix[k][k];
+            }
+        }
+        return make_pair(L, U); 
+    }
+
+
+    // Ax = b
+    vector<DataType> solveWithLU(const vector<DataType>& b) const {
+        vector<DataType> x(Size), y(Size);
+        pair<SquareMatrix, SquareMatrix> lu = LU();
+        for (size_t i = 0; i < Size; i++) {
+           y[i] = b[i];
+           for (size_t k = 0; k < i; k++) {
+                y[i] -= lu.first.matrix[i][k] * y[k];
+           }
+           y[i] /= lu.first.matrix[i][i];
+        }
+        for (int i = Size - 1; i >= 0; i--) {
+            x[i] = y[i];
+            for (size_t k = (size_t)i + 1; k < Size; k++) {
+                x[i] -= lu.second.matrix[i][k] * x[k];
+            }
+        }
+        return x;
+    }
+
+
+
+    pair<SquareMatrix, SquareMatrix> cholesky() const {
+        SquareMatrix L(Size), Lt(Size);
+
+        for (size_t j = 0; j < Size; j++) {
+            
+            L.matrix[j][j] = matrix[j][j];
+            for (size_t k = 0; k < j; k++) {
+                L.matrix[j][j] -= L.matrix[j][k] * L.matrix[j][k];
+            }
+            L.matrix[j][j] = sqrt(L.matrix[j][j]);
+            for (size_t i = j + 1; i < Size; i++) {
+                L.matrix[i][j] = matrix[i][j];
+                for (size_t k = 0; k < j; k++) {
+                    L.matrix[i][j] -= L.matrix[i][k] * L.matrix[j][k];
+                }
+                L.matrix[i][j] /= L.matrix[j][j];
+            }
+
+
+        }
+        Lt = L.getTranspose();
+        return make_pair(L, Lt); 
+    }
+
+    vector<DataType> solveWithCholesky(const vector<DataType>& b) const {
+        vector<DataType> x(Size), y(Size);
+        pair<SquareMatrix, SquareMatrix> llt = cholesky();
+        for (size_t i = 0; i < Size; i++) {
+           y[i] = b[i];
+           for (size_t k = 0; k < i; k++) {
+                y[i] -= llt.first.matrix[i][k] * y[k];
+           }
+           y[i] /= llt.first.matrix[i][i];
+        }
+        for (int i = Size - 1; i >= 0; i--) {
+            x[i] = y[i];
+            for (size_t k = (size_t)i + 1; k < Size; k++) {
+                x[i] -= llt.first.matrix[k][i] * x[k];
+            }
+            x[i] /= llt.first.matrix[i][i]; 
+        }
+        return x;
+    }
+
+
+    pair<SquareMatrix, SquareMatrix> QR() const {
+        SquareMatrix Q(Size), R(Size);
+        for (size_t i = 0; i < Size; i++) {
+            R.matrix[0][0] += matrix[i][0] * matrix[i][0];
+
+        }
+        R.matrix[0][0] = sqrt(R.matrix[0][0]);
+
+        for (size_t i = 0; i < Size; i++) {
+            Q[i][0] = matrix[i][0] / R.matrix[0][0];
+        }
+
+        for (size_t k = 1; k < Size; k++) { 
+            for (size_t j = 0; j < k; j++) { 
+                for (size_t i = 0; i < Size; i++) {
+                    R.matrix[j][k] += matrix[i][k] * Q.matrix[i][j];
+                }
+            }
+            for (size_t j = 0; j < k; j++) { 
+                R.matrix[k][k] -= R.matrix[j][k] * R.matrix[j][k];
+            }
+            for (size_t i = 0; i < Size; i++) {
+                R.matrix[k][k] += matrix[i][k] * matrix[i][k];
+            } 
+            R.matrix[k][k] = sqrt(R.matrix[k][k]);
+            for (size_t i = 0; i < Size; i++) {
+                Q.matrix[i][k] = matrix[i][k];
+                for (size_t j = 0; j < k; j++) {
+                    Q.matrix[i][k] -= R.matrix[j][k] * Q.matrix[i][j];
+                }
+                Q.matrix[i][k] /= R.matrix[k][k];
+            }
+            
+        }
+
+        return make_pair(Q, R); 
+    }
+
+    vector<DataType> solveWithQR(const vector<DataType>& b) const {
+        vector<DataType> x(Size), y(Size);
+        pair<SquareMatrix, SquareMatrix> qr = QR();
+        for (size_t i = 0; i < Size; i++) {
+            for (size_t j = 0; j < Size; j++) {
+                y[i] += qr.first.matrix[j][i] * b[j];
+            }
+        }
+        x[Size - 1] = y[Size - 1] / qr.second.matrix[Size - 1][Size -1];
+        for (int i = Size - 1; i >= 0; i--) {
+            x[i] = y[i];
+            for (size_t j = (size_t)i + 1; j < Size; j++) {
+                x[i] -= qr.second.matrix[i][j] * x[j];
+            }
+            x[i] /= qr.second.matrix[i][i];
+        }
+        return x;
+    }
+
 
 	friend istream& operator >> (istream& in, SquareMatrix& A) {
 		in >> A.Size;
@@ -496,155 +879,32 @@ class SquareMatrix {
 		return out;
 	}
 
+
+    static SquareMatrix getAp(uint32_t n, uint32_t p) {
+        SquareMatrix ret(n);
+        vector< vector<DataType> > C = computeBinomial(n + p, n + p);
+        for (size_t i = 0; i < n; i++) {
+            for (size_t j = 0; j < n; j++) {
+                ret.matrix[i][j] = static_cast<DataType>(C[p + j][i]);
+            }
+        }
+        return ret;
+    }
 };
 
 
+template<class T> void printV(T v) {
+    for (auto x : v) {
+        cout << x << " ";
+    }
+}
 
-template<class DataType>
-class Rational {
-	DataType p, q;
-
-	long long gcd(long long a, long long b) {
-		return !b ? a : gcd(b, a % b);
-	}
-
-	long long lcm(long long a, long long b) {
-		return a * b / gcd(a, b);
-	}
-
-	void simplify() {
-		DataType g = gcd(p, q);
-		p /= g;
-		q /= g;
-	}
-
-public:
-
-	Rational(DataType P = DataType(), DataType Q = DataType(1)) :
-		p(P), q(Q) {
-
-	}
-
-	Rational& operator = (const Rational& b) {
-		p = b.p;
-		q = b.q;
-		return *this;
-	}
-
-	Rational& operator = (const int& b) {
-		p = b;
-		q = 1;
-		return *this;
-	}
-
-	void operator += (const Rational& b) {
-		if (b.q == DataType()) return;
-		if (q == 0) {
-			*this = b;
-			return;
-		}
-		long long y = lcm(q, b.q);
-		long long x = p * y / q + b.p * y / b.q;
-		p = static_cast<DataType>(x);
-		q = static_cast<DataType>(y);
-		if (p == 0 || q == 0) {
-			p = q = 0;
-		}
-	}
-
-	Rational operator + (const Rational& b) const {
-		Rational ret = *this;
-		ret += b;
-		return ret;
-	}
-
-	void operator -= (const Rational& b) {
-		if (b.q == DataType()) return;
-		if (q == 0) {
-			*this = b;
-			return;
-		}
-		long long y = lcm(q, b.q);
-		long long x = p * y / q - b.p * y / b.q;
-		p = static_cast<DataType>(x);
-		q = static_cast<DataType>(y);
-		if (p == 0 || q == 0) {
-			p = q = 0;
-		}
-	}
-
-	Rational operator - (const Rational& b) const {
-		Rational ret = *this;
-		ret -= b;
-		return ret;
-	}
-
-	void operator *= (const Rational& b) {
-		p *= b.p;
-		q *= b.q;
-		if (p == 0 || q == 0) {
-			p = q = 0;
-			return;
-		}
-	}
-
-	Rational operator * (const Rational& b) const {
-		Rational ret = *this;
-		ret *= b;
-		return ret;
-	}
-
-	void operator /= (const Rational& b) {
-		p *= b.q;
-		q *= b.p;
-		if (p == 0 || q == 0) {
-			p = q = 0;
-			return;
-		}
-	}
-
-	Rational operator / (const Rational& b) const {
-		Rational ret = *this;
-		ret /= b;
-		return ret;
-	}
-
-	friend istream& operator >> (istream& in, Rational& f) {
-		in >> f.p >> f.q;
-		return in;
-	}
-
-	friend ostream& operator << (ostream& out, const Rational& f) {
-		out << f.p << "/" << f.q;
-		return out;
-	}
-
-	bool operator == (const Rational& b) {
-		return (p == b.p && q == b.q);
-	}
-
-	bool operator < (const Rational& b) {
-		return 1.0 * p / q < 1.0* b.p / b.q;
-	}
-
-	bool operator >(const Rational& b) {
-		return 1.0 * p / q > 1.0* b.p / b.q;
-	}
-};
 
 int main() {
-	ifstream cin("test.in");
-	ofstream cout("test.out");
-
-	SquareMatrix< Rational< Polynomial<int> > > A = vector< vector< Rational< Polynomial<int> > > > {
-		
-		
-		{ Rational< Polynomial<int> >{ vector<int> { 1, 2, 3 }, vector<int> { 2, 4, 5 } }, Rational< Polynomial<int> >{ vector<int> { 1, 2, 3 }, vector<int> { 2, 4, 5 } } },
-		{ Rational< Polynomial<int> >{ vector<int> { 1, 2, 3 }, vector<int> { 2, 4, 5 } }, Rational< Polynomial<int> >{ vector<int> { 1, 2, 3 }, vector<int> { 2, 4, 5 } } }
-
-	};
-
-	cout << A << "\n";
-	
-	return 0;
+    
+    vector< vector<double> > d  = {{7, 2, 1, -3}, {0, 3, -1, 5}, {-3, 4, -2, 7}, {13, 5, -11, 2}};
+    // d = {{1, 2, 3}, {2, 5, 3}, {1, 0, 8}};
+    SquareMatrix<double> A = d;
+    cout << A.getInverse() * A<< "\n";
+    return 0;
 }
