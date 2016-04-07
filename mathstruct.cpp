@@ -447,6 +447,28 @@ class SquareMatrix {
 		return !(*this == B);
 	}
 
+    vector<DataType> multiplyByVector(const vector<DataType>& b) const {
+       vector<DataType> ret(Size);
+       for (size_t i = 0; i < Size; i++) {
+            for (size_t j = 0; j < Size; j++) {
+               ret[i] += b[j] * matrix[i][j]; 
+            }
+       }
+
+       return ret;
+    }
+
+
+    SquareMatrix multiplyByConstant(const DataType& c) const {
+        SquareMatrix ret(Size);
+        for (size_t i = 0; i < Size; i++) {
+            for (size_t j = 0; j < Size; j++) {
+                ret.matrix[i][j] = matrix[i][j] * c;
+            }
+        }
+        return ret;
+    }
+
 	template<class powType>
 	SquareMatrix pow(powType K) {
 		SquareMatrix B = *this;
@@ -575,6 +597,22 @@ class SquareMatrix {
                 C.matrix[i][j] = CPrep.matrix[i][j];
             }
         }
+    }
+
+    DataType getNormInf() const {
+        DataType ret = numeric_limits<DataType>::min();
+        for (size_t i = 0; i < Size; i++) {
+           ret = max(ret, accumulate(begin(matrix[i]), end(matrix[i]),
+                       DataType(), [](const DataType& s, DataType b) {
+               return s + abs(b);     
+            }));
+        }
+        return ret;
+    }
+
+    DataType getNorm1() const {
+        SquareMatrix m = getTranspose();
+        return m.getNormInf();
     }
 
     SquareMatrix getInverse() const {
@@ -857,6 +895,70 @@ class SquareMatrix {
         return x;
     }
 
+    SquareMatrix getDiag() const {
+        SquareMatrix ret(Size);
+        for (size_t i = 0; i < Size; i++) {
+            ret.matrix[i][i] = matrix[i][i]; 
+        }
+        return ret;
+    }
+
+    tuple<vector<DataType>, DataType, size_t> jacobiRelaxata(const 
+            size_t& iterations, long double epsilon,  const vector<DataType>& a)
+        const {
+        SquareMatrix I = getIdentityMatrix();
+
+        SquareMatrix B(Size);
+        vector<DataType> b(Size);
+        for (size_t i = 0; i < Size; i++) {
+            for (size_t j = 0; j < Size; j++) {
+                B.matrix[i][j] = matrix[i][j] / matrix[i][i];
+            }
+            b[i] = a[i] / matrix[i][i];
+        }
+        
+        DataType t = 2.0 / B.getNormInf();
+        DataType h = t / iterations;
+        vector<DataType> ret;
+        size_t minSteps = numeric_limits<size_t>::max();
+        DataType sigmaMin = 0.0;
+        for (size_t k = 1; k < iterations; k++) {
+            DataType sigma = k * h;
+            // I - sigma * D^(-1)*A
+            SquareMatrix C = I - B.multiplyByConstant(sigma);
+            vector<long double> c = b;
+            for (size_t i = 0; i < Size; i++) {
+                c[i] = sigma * b[i];
+            }
+            DataType err = 0.0;
+            size_t steps = 0; 
+            vector<DataType> x(Size), y;
+            do {
+                y = C.multiplyByVector(x);
+                for (size_t i = 0; i < Size; i++) {
+                    y[i] += c[i];
+                }
+                
+                DataType norm = 0.0;
+                for (size_t i = 0; i < Size; i++) {
+                    norm += matrix[i][i] * abs(y[i] - x[i]) * abs(y[i] - x[i]);
+                }
+
+                norm = sqrt(norm);
+                err = norm;
+                swap(x, y);
+                steps++;
+            } while (err >= epsilon);
+            
+            if (steps < minSteps) {
+                minSteps = steps;
+                sigmaMin = sigma;
+                ret = x;
+            }
+        }
+        
+        return make_tuple(ret, sigmaMin, minSteps);
+    }
 
 	friend istream& operator >> (istream& in, SquareMatrix& A) {
 		in >> A.Size;
@@ -879,7 +981,96 @@ class SquareMatrix {
 		return out;
 	}
 
+    vector<DataType> metodaGradientuluiConjugat(long double epsilon,  const
+            vector<DataType>& b) const {
+        vector<DataType> x(Size);
+        vector<DataType> r = b;
+        vector<DataType> aux = (*this).multiplyByVector(x);
+        auto getDot = [](const vector<DataType>& a, const vector<DataType>& b) {
+            DataType ret = DataType();
+            for (size_t i = 0; i < a.size(); i++) {
+                ret += a[i] * b[i];
+            }
+            return ret;
+        };
 
+        for (size_t i = 0; i < Size; i++) {
+            r[i] -= aux[i];
+        }
+        
+        vector<DataType> p = r;
+        DataType rsold = getDot(r, r);
+        for (size_t i = 0; i < Size; i++) {
+            vector<DataType> ap = (*this).multiplyByVector(p);
+            DataType alpha = rsold / getDot(p, ap);
+            for (size_t j = 0; j < Size; j++) {
+                x[j] += alpha * p[j];
+                r[j] -= alpha * ap[j];
+            }
+            DataType rsnew = getDot(r, r);
+            if (sqrt(rsnew) < epsilon) {
+                break;
+            }
+            DataType f = rsnew / rsold;
+            for (size_t j = 0; j < Size; j++) {
+                p[j] = r[j] + f * p[j]; 
+            }
+            rsold = rsnew;
+        }
+        return x;
+
+    }
+
+    tuple<vector<DataType>, DataType, size_t> GaussSeidelRelaxata(const 
+            size_t& iterations, long double epsilon,  const vector<DataType>&
+            b) const {
+        
+        DataType t = 2.0;
+        DataType h = t / iterations;
+        vector<DataType> ret;
+        size_t minSteps = numeric_limits<size_t>::max();
+        DataType sigmaMin = 0.0;
+        for (size_t k = 1; k < iterations; k++) {
+            DataType sigma = k * h;
+            DataType err = 0.0;
+            size_t steps = 0; 
+            vector<DataType> x(Size), y(Size);
+            do {
+                for (size_t i = 0; i < Size; i++) {
+                    DataType s = -b[i];
+                    for (size_t j = 0; j < i; j++) {
+                        s += matrix[i][j] * y[j]; 
+                    }
+                    for (size_t j = i + 1; j < Size; j++) {
+                        s += matrix[i][j] * x[j]; 
+                    }
+                    y[i] = (1 - sigma) * x[i] - (s * sigma) / matrix[i][i];
+                }
+                
+                DataType norm = 0.0;
+                for (size_t i = 0; i < Size; i++) {
+                    for (size_t j = 0; j < Size; j++) {
+                        norm += matrix[i][j] * abs(y[i] - x[i]) * abs(y[j] -
+                                x[j]);
+                    }
+                }
+
+                norm = sqrt(norm);
+                err = norm;
+                swap(x, y);
+                steps++;
+            } while (err >= epsilon);
+            
+            if (steps < minSteps) {
+                minSteps = steps;
+                sigmaMin = sigma;
+                ret = x;
+            }
+        }
+        
+        return make_tuple(ret, sigmaMin, minSteps);
+
+    }
     static SquareMatrix getAp(uint32_t n, uint32_t p) {
         SquareMatrix ret(n);
         vector< vector<DataType> > C = computeBinomial(n + p, n + p);
@@ -890,21 +1081,85 @@ class SquareMatrix {
         }
         return ret;
     }
+
+    static pair<SquareMatrix, vector<DataType> > getAt3(uint32_t m) {
+        SquareMatrix A(m);
+        vector<DataType> b(m);
+        for (size_t i = 0; i < m; i++) {
+            b[i] = 1.0 / (m * m);
+            A.matrix[i][i] = 2 + b[i];
+            if (i != m - 1) {
+                A.matrix[i][i + 1] = A.matrix[i + 1][i] = -1;
+            }
+        }
+        return make_pair(A, b);
+    }
+
 };
 
 
-template<class T> void printV(T v) {
+template<class T> void printV(T v, const string sep = " ") {
+    cout.precision(16);
     for (auto x : v) {
-        cout << x << " ";
+        cout << x << sep;
     }
 }
 
+void rezolvaGaussSeidel() {
+    cout << "Metoda gauss seidel\n";
+    size_t m = 10;
+    long double eps = 1e-10;
+    size_t intervale = 100;
+    pair<SquareMatrix<long double>, vector<long double> > p = SquareMatrix<long
+        double>::getAt3(m);
+
+    vector<long double> x;
+    long double sigma;
+    size_t steps;
+    tie(x, sigma, steps) = p.first.GaussSeidelRelaxata(intervale, eps, p.second);
+    cout << "Solutia : \n";
+    printV(x, "\n");
+    cout << "\nSigma :" << sigma << "\n";
+    cout << "Numar pasi: " << steps << "\n";
+}
+
+void rezolvaJacobi() {
+    cout << "Metoda jacobi\n";
+    size_t m = 10;
+    long double eps = 1e-10;
+    size_t intervale = 100;
+    pair<SquareMatrix<long double>, vector<long double> > p = SquareMatrix<long
+        double>::getAt3(m);
+
+    /*
+    cout << p.first << "\n";
+    printV(p.second);
+    cout << "\n";
+    */
+    vector<long double> x;
+    long double sigma;
+    size_t steps;
+    tie(x, sigma, steps) = p.first.jacobiRelaxata(intervale, eps, p.second);
+    cout << "Solutia : \n";
+    printV(x, "\n");
+    cout << "\nSigma :" << sigma << "\n";
+    cout << "Numar pasi: " << steps << "\n\n\n";
+}
+
+void rezolvaMetGConj() {
+    size_t m = 10;
+    long double eps = 1e-10;
+    pair<SquareMatrix<long double>, vector<long double> > p = SquareMatrix<long
+        double>::getAt3(m);
+    vector<long double> x = p.first.metodaGradientuluiConjugat(eps, p.second);
+
+    cout << "\n\nMetoda Gradientului conjugat\n";
+    printV(x, "\n");
+}
 
 int main() {
-    
-    vector< vector<double> > d  = {{7, 2, 1, -3}, {0, 3, -1, 5}, {-3, 4, -2, 7}, {13, 5, -11, 2}};
-    // d = {{1, 2, 3}, {2, 5, 3}, {1, 0, 8}};
-    SquareMatrix<double> A = d;
-    cout << A.getInverse() * A<< "\n";
+    rezolvaJacobi();
+    rezolvaGaussSeidel();
+    rezolvaMetGConj();
     return 0;
 }
