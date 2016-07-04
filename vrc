@@ -1,0 +1,95 @@
+
+set nocompatible              " be iMproved, required
+filetype off                  " required
+
+" set the runtime path to include Vundle and initialize
+set rtp+=~/.vim/bundle/Vundle.vim
+call vundle#begin()
+
+Plugin 'VundleVim/Vundle.vim'
+Plugin 'fatih/vim-go'
+Plugin 'mephux/vim-jsfmt'
+Plugin 'nrocco/vim-phplint'
+Plugin 'jelera/vim-javascript-syntax'
+Plugin 'Valloric/YouCompleteMe'
+Plugin 'scrooloose/syntastic'
+Plugin 'flazz/vim-colorschemes'
+Plugin 'dag/vim2hs'
+
+" Haskell configuration
+let g:haskell_tabular = 0
+let g:haskell_quasi         = 0
+let g:haskell_interpolation = 0
+let g:haskell_regex         = 0
+let g:haskell_jmacro        = 0
+let g:haskell_shqq          = 0
+let g:haskell_sql           = 0
+let g:haskell_json          = 0
+let g:haskell_xml           = 0
+" disable all conceals, including the simple ones like
+" lambda and composition
+let g:haskell_conceal              = 0
+
+" disable concealing of "enumerations": commatized lists like
+" deriving clauses and LANGUAGE pragmas,
+" otherwise collapsed into a single ellipsis
+let g:haskell_conceal_enumerations = 0
+set nofoldenable
+
+call vundle#end()
+filetype plugin indent on     " required
+
+set background=dark 
+syntax on
+
+set smartindent
+set autoindent
+set smarttab
+set expandtab
+set backspace=2
+set tabstop=4
+set shiftwidth=4
+set autoread
+set nowrap
+set number
+set wildmode=longest,list
+set ruler
+
+autocmd FileType cpp setlocal makeprg=g++-5\ -O2\ -Wall\ -Wextra\ -std=c++11\ -o\ %<\ %
+autocmd FileType c setlocal makeprg=gcc\ -O2\ -Wall\ -Wextra\ -o\ %<\ %
+autocmd FileType haskell setlocal makeprg=ghc\ %<\ %
+autocmd Filetype java set makeprg=javac\ %
+
+autocmd FileType java map <buffer> <F9> :!time java %:r<CR>
+autocmd FileType haskell map <buffer> <F9> :!time runhaskell %<CR>
+autocmd FileType cpp map <buffer> <F9> :!time ./%<<CR>
+autocmd FileType c map <buffer> <F9> :!time ./%<<CR>
+autocmd FileType python map <buffer> <F9> :!python3 %<CR>
+autocmd FileType coffee map<buffer> <F9> :!coffee %<CR>
+autocmd FileType go map<buffer> <F9> :!go run %<CR>
+autocmd FileType r map<buffer> <F9> :!Rscript %<CR>
+autocmd FileType javascript map<buffer> <F9> :!node %<CR>
+
+
+map <F2> :w<CR>
+imap <F2> <ESC>:w<CR>
+
+map <F3> :tabnew<CR>:e
+imap <F3> :tabnew<CR>:e
+
+map <F4> :q<CR>
+
+map <F5> :tabprev<CR>
+imap <F5> :tabprev<CR>
+
+map <F6> :tabnext<CR>
+imap <F6> :tabnext<CR>s
+
+map <F7> :make!<CR>
+imap <F7> :make!<CR>
+
+map <C-y> dd
+imap <C-y> ddi
+
+map <F1> <C-W>
+imap <F1> <C-W>
